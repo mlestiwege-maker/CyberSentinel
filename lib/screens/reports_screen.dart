@@ -9,6 +9,7 @@ class ReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return AppScaffold(
       currentRoute: '/reports',
@@ -16,7 +17,7 @@ class ReportsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const KpiStrip(
+          KpiStrip(
             items: [
               KpiItem(
                 label: 'MTTD',
@@ -32,7 +33,7 @@ class ReportsScreen extends StatelessWidget {
                 label: 'Detection Accuracy',
                 value: '94.6%',
                 icon: Icons.gpp_good,
-                color: Colors.green,
+                color: scheme.primary,
               ),
             ],
           ),

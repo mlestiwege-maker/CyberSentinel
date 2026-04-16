@@ -69,7 +69,7 @@ class _KpiCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             CircleAvatar(
@@ -84,11 +84,14 @@ class _KpiCard extends StatelessWidget {
                   Text(
                     item.value,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                         ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(item.label),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),

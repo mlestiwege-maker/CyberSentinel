@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'data/threat_feed_service.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/incidents_screen.dart';
@@ -7,6 +8,7 @@ import 'screens/reports_screen.dart';
 import 'screens/settings_screen.dart';
 
 void main() {
+  ThreatFeedService().initialize();
   runApp(const CyberSentinelApp());
 }
 
@@ -20,26 +22,69 @@ class CyberSentinelApp extends StatefulWidget {
 class _CyberSentinelAppState extends State<CyberSentinelApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
+  @override
+  void initState() {
+    super.initState();
+    ThreatFeedService().initialize();
+  }
+
   ThemeData _buildTheme(Brightness brightness) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF0B3D91),
       brightness: brightness,
     );
+    final baseTextTheme = Typography.material2021().black;
+    final textTheme = baseTextTheme.copyWith(
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.1,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        height: 1.35,
+      ),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(
+        height: 1.3,
+      ),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      textTheme: textTheme.apply(
+        bodyColor: colorScheme.onSurface,
+        displayColor: colorScheme.onSurface,
+      ),
       scaffoldBackgroundColor:
           brightness == Brightness.light ? const Color(0xFFF3F6FB) : const Color(0xFF0E141F),
-      cardTheme: const CardThemeData(
-        elevation: 1.5,
+      cardTheme: CardThemeData(
+        elevation: 1.2,
         margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+          ),
+        ),
       ),
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,
         backgroundColor: colorScheme.primary,
         foregroundColor: Colors.white,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -50,6 +95,20 @@ class _CyberSentinelAppState extends State<CyberSentinelApp> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        labelStyle: textTheme.labelMedium,
+      ),
+      dividerTheme: DividerThemeData(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        thickness: 0.8,
       ),
     );
   }
@@ -65,7 +124,7 @@ class _CyberSentinelAppState extends State<CyberSentinelApp> {
       settings: settings,
       transitionDuration: const Duration(milliseconds: 260),
       reverseTransitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, __, ___) => page,
+      pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
           parent: animation,

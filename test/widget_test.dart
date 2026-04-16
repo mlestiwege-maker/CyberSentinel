@@ -1,14 +1,18 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cybersentinel_frontend/data/threat_feed_service.dart';
 import 'package:cybersentinel_frontend/main.dart';
 
 void main() {
   void configureTestViewport(WidgetTester tester) {
+    final feed = ThreatFeedService();
+    feed.reset();
+
     tester.view.physicalSize = const Size(1600, 2400);
     tester.view.devicePixelRatio = 1.0;
+    addTearDown(feed.shutdown);
   }
 
   Future<void> navigateToSection(WidgetTester tester, String route, String label) async {
@@ -44,7 +48,7 @@ void main() {
     await tester.pumpWidget(const CyberSentinelApp());
     await navigateToSection(tester, '/alerts', 'Alerts');
 
-    expect(find.text('Alerts Screen'), findsOneWidget);
+    expect(find.text('Threat Alerts Feed'), findsOneWidget);
   });
 
   testWidgets('Drawer navigates to Monitoring screen', (WidgetTester tester) async {
@@ -55,7 +59,7 @@ void main() {
     await tester.pumpWidget(const CyberSentinelApp());
     await navigateToSection(tester, '/monitoring', 'Monitoring');
 
-    expect(find.text('Monitoring Screen'), findsOneWidget);
+    expect(find.text('Live Packet Inspection Feed'), findsOneWidget);
   });
 
   testWidgets('Drawer navigates to Reports screen', (WidgetTester tester) async {
@@ -117,7 +121,7 @@ void main() {
     await tester.pumpWidget(const CyberSentinelApp());
     await navigateToSection(tester, '/alerts', 'Alerts');
 
-    await tester.tap(find.text('DDoS • 192.168.1.10'));
+    await tester.tap(find.byIcon(Icons.chevron_right).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Alert Details'), findsOneWidget);

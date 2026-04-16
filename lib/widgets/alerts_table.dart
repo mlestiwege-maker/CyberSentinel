@@ -1,25 +1,39 @@
 import 'package:flutter/material.dart';
 
-class AlertsTable extends StatelessWidget {
-  const AlertsTable({super.key});
+import '../data/threat_feed_service.dart';
 
-  Widget _severityChip(String severity) {
+class AlertsTable extends StatelessWidget {
+  const AlertsTable({
+    required this.alerts,
+    super.key,
+  });
+
+  final List<ThreatAlert> alerts;
+
+  String _timeLabel(DateTime dateTime) {
+    final hh = dateTime.hour.toString().padLeft(2, '0');
+    final mm = dateTime.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  Widget _severityChip(BuildContext context, String severity) {
+    final scheme = Theme.of(context).colorScheme;
     Color bg;
     Color fg;
 
     switch (severity) {
       case 'Critical':
-        bg = Colors.red.shade100;
-        fg = Colors.red.shade900;
+        bg = scheme.errorContainer.withValues(alpha: 0.6);
+        fg = scheme.onErrorContainer;
         break;
       case 'High':
-        bg = Colors.orange.shade100;
-        fg = Colors.orange.shade900;
+        bg = scheme.tertiaryContainer.withValues(alpha: 0.65);
+        fg = scheme.onTertiaryContainer;
         break;
       case 'Medium':
       default:
-        bg = Colors.amber.shade100;
-        fg = Colors.amber.shade900;
+        bg = scheme.secondaryContainer.withValues(alpha: 0.6);
+        fg = scheme.onSecondaryContainer;
         break;
     }
 
@@ -72,35 +86,20 @@ class AlertsTable extends StatelessWidget {
                       DataColumn(label: Text('Severity')),
                       DataColumn(label: Text('Status')),
                     ],
-                    rows: [
-                      DataRow(
-                        cells: [
-                          const DataCell(Text('10:15')),
-                          const DataCell(Text('DDoS')),
-                          const DataCell(Text('192.168.1.10')),
-                          DataCell(_severityChip('High')),
-                          const DataCell(Text('Blocked')),
-                        ],
-                      ),
-                      DataRow(
-                        cells: [
-                          const DataCell(Text('10:30')),
-                          const DataCell(Text('Ransomware')),
-                          const DataCell(Text('192.168.1.22')),
-                          DataCell(_severityChip('Critical')),
-                          const DataCell(Text('Investigating')),
-                        ],
-                      ),
-                      DataRow(
-                        cells: [
-                          const DataCell(Text('11:00')),
-                          const DataCell(Text('Phishing')),
-                          const DataCell(Text('192.168.1.35')),
-                          DataCell(_severityChip('Medium')),
-                          const DataCell(Text('Resolved')),
-                        ],
-                      ),
-                    ],
+                    rows: alerts
+                        .take(8)
+                        .map(
+                          (alert) => DataRow(
+                            cells: [
+                              DataCell(Text(_timeLabel(alert.time))),
+                              DataCell(Text(alert.attackType)),
+                              DataCell(Text(alert.sourceIp)),
+                              DataCell(_severityChip(context, alert.severity)),
+                              DataCell(Text(alert.status)),
+                            ],
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ),

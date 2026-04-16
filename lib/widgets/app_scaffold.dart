@@ -39,7 +39,7 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   Widget _desktopSidebar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final sidebarWidth = _isSidebarCollapsed ? 88.0 : 260.0;
+    final sidebarWidth = _isSidebarCollapsed ? 84.0 : 252.0;
 
     return Container(
       width: sidebarWidth,
@@ -48,7 +48,7 @@ class _AppScaffoldState extends State<AppScaffold> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [colorScheme.primary, colorScheme.secondary],
@@ -62,20 +62,18 @@ class _AppScaffoldState extends State<AppScaffold> {
                 const Icon(Icons.security, color: Colors.white, size: 34),
                 if (!_isSidebarCollapsed) ...[
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'CyberSentinel',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
+                  Text(
                     'SOC Command Center',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.white70,
-                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -97,6 +95,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                       dense: _isSidebarCollapsed,
                       contentPadding: EdgeInsets.symmetric(
                         horizontal: _isSidebarCollapsed ? 24 : 16,
+                        vertical: _isSidebarCollapsed ? 4 : 2,
                       ),
                     ),
                   )

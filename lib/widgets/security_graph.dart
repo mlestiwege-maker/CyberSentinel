@@ -1,12 +1,47 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class SecurityGraph extends StatelessWidget {
-  const SecurityGraph({super.key});
+  const SecurityGraph({
+    required this.trendPoints,
+    super.key,
+  });
+
+  final List<int> trendPoints;
+
+  String _weekdayLabel(int index) {
+    switch (index) {
+      case 0:
+        return 'Mon';
+      case 1:
+        return 'Tue';
+      case 2:
+        return 'Wed';
+      case 3:
+        return 'Thu';
+      case 4:
+        return 'Fri';
+      case 5:
+        return 'Sat';
+      case 6:
+        return 'Sun';
+      default:
+        return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final safePoints = trendPoints.isNotEmpty ? trendPoints : [2, 4, 3, 5, 4, 6, 5];
+    final maxY = (safePoints.reduce(max) + 2).toDouble();
+
+    final spots = <FlSpot>[];
+    for (var i = 0; i < safePoints.length; i++) {
+      spots.add(FlSpot(i.toDouble(), safePoints[i].toDouble()));
+    }
 
     return Card(
       child: Padding(
@@ -25,9 +60,9 @@ class SecurityGraph extends StatelessWidget {
               child: LineChart(
                 LineChartData(
                   minX: 0,
-                  maxX: 4,
+                  maxX: (safePoints.length - 1).toDouble(),
                   minY: 0,
-                  maxY: 8,
+                  maxY: maxY,
                   gridData: FlGridData(show: true),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
@@ -43,20 +78,11 @@ class SecurityGraph extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          switch (value.toInt()) {
-                            case 0:
-                              return const Text('Mon');
-                            case 1:
-                              return const Text('Tue');
-                            case 2:
-                              return const Text('Wed');
-                            case 3:
-                              return const Text('Thu');
-                            case 4:
-                              return const Text('Fri');
-                            default:
-                              return const SizedBox.shrink();
+                          final label = _weekdayLabel(value.toInt());
+                          if (label.isEmpty) {
+                            return const SizedBox.shrink();
                           }
+                          return Text(label);
                         },
                       ),
                     ),
@@ -64,13 +90,7 @@ class SecurityGraph extends StatelessWidget {
                   borderData: FlBorderData(show: true),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: const [
-                        FlSpot(0, 2),
-                        FlSpot(1, 4),
-                        FlSpot(2, 3),
-                        FlSpot(3, 6),
-                        FlSpot(4, 5),
-                      ],
+                      spots: spots,
                       color: Theme.of(context).colorScheme.primary,
                       isCurved: true,
                       barWidth: 3,

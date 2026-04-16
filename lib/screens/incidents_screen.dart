@@ -9,6 +9,7 @@ class IncidentsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return AppScaffold(
       currentRoute: '/incidents',
@@ -16,19 +17,19 @@ class IncidentsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const KpiStrip(
+          KpiStrip(
             items: [
               KpiItem(
                 label: 'Open Incidents',
                 value: '3',
                 icon: Icons.pending_actions,
-                color: Colors.orange,
+                color: scheme.tertiary,
               ),
               KpiItem(
                 label: 'Contained',
                 value: '12',
                 icon: Icons.check_circle,
-                color: Colors.green,
+                color: scheme.primary,
               ),
               KpiItem(
                 label: 'Avg Response',
@@ -102,15 +103,16 @@ class _IncidentTile extends StatelessWidget {
   final String subtitle;
   final String level;
 
-  Color _levelColor() {
+  Color _levelColor(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     switch (level) {
       case 'Critical':
-        return Colors.red;
+        return scheme.error;
       case 'High':
-        return Colors.orange;
+        return scheme.tertiary;
       case 'Medium':
       default:
-        return Colors.amber;
+        return scheme.secondary;
     }
   }
 
@@ -119,8 +121,8 @@ class _IncidentTile extends StatelessWidget {
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _levelColor().withValues(alpha: 0.15),
-          child: Icon(Icons.report_gmailerrorred, color: _levelColor()),
+          backgroundColor: _levelColor(context).withValues(alpha: 0.15),
+          child: Icon(Icons.report_gmailerrorred, color: _levelColor(context)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

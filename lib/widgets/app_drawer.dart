@@ -35,32 +35,30 @@ class AppDrawer extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: const FittedBox(
+            child: FittedBox(
               alignment: Alignment.topLeft,
               fit: BoxFit.scaleDown,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.security,
                     color: Colors.white,
-                    size: 44,
+                    size: 40,
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text(
                     'CyberSentinel',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Colors.white,
-                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Threat Monitoring',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Colors.white70,
-                      fontSize: 13,
                     ),
                   ),
                 ],
