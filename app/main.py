@@ -13,6 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.models import (
     IngestResponse,
+    MLModelInfo,
+    MLPredictionResponse,
+    MLTrainingRequest,
+    MLTrainingResponse,
     NetworkMetric,
     NotificationChannelConfig,
     NotificationChannelsResponse,
@@ -30,6 +34,7 @@ from app.models import (
 from app.services.notification_service import NotificationChannel, NotificationService
 from app.services.packet_sniffer import get_sniffer
 from app.services.feature_extractor import FeatureExtractor
+from app.services.ml_threat_model import get_threat_model
 from app.services.stats_collector import ResilienceStatsCollector
 from app.services.threat_engine import ThreatEngine
 
@@ -37,6 +42,7 @@ engine = ThreatEngine()
 stats_collector = ResilienceStatsCollector()
 feature_extractor = FeatureExtractor()
 packet_sniffer = get_sniffer()
+threat_model = get_threat_model()
 
 
 @asynccontextmanager
@@ -269,6 +275,95 @@ async def stop_packet_capture() -> PacketCaptureResponse:
 async def get_capture_status() -> PacketCaptureStatus:
     """Get current packet capture status."""
     return PacketCaptureStatus(**packet_sniffer.get_stats())
+
+
+@app.get("/api/v1/ml/model/info", response_model=MLModelInfo)
+async def get_ml_model_info() -> MLModelInfo:
+    """Get information about ML threat detection model."""
+    return MLModelInfo(**threat_model.get_model_info())
+
+
+@app.post("/api/v1/ml/model/train", response_model=MLTrainingResponse)
+async def train_ml_model(request: MLTrainingRequest) -> MLTrainingResponse:
+    """Train ML model on historical threat events."""
+    try:
+        # Get recent alerts with consistent failures
+        recent_alerts = engine.get_alerts()[:request.training_events]
+        
+        if len(recent_alerts) < 10:
+            return MLTrainingResponse(
+                success=False,
+                message=f"Insufficient training data: {len(recent_alerts)} alerts (need 10+)",
+            )
+
+        # Convert alerts back to traffic events (synthetic representation)
+        training_events: list[TrafficEvent] = []
+        for alert in recent_alerts:
+            event = TrafficEvent(
+                source_ip=alert.source_ip,
+                destination_ip="172.16.254.1",
+                protocol="TCP",
+                destination_port=445,
+                bytes_in=150000 + (int(alert.confidence * 100000)),
+                bytes_out=120000 + (int(alert.confidence * 80000)),
+                failed_logins=int(alert.confidence * 5),
+                geo_anomaly=alert.severity in {"Critical", "High"},
+                user_agent_risk=alert.confidence,
+                timestamp=alert.time,
+            )
+            training_events.append(event)
+
+        # Train model
+        stats = threat_model.train(training_events)
+
+        if "error" in stats:
+            return MLTrainingResponse(
+                success=False,
+                message=f"Training failed: {stats.get('error')}",
+            )
+
+        return MLTrainingResponse(
+            success=True,
+            events_trained=stats.get("events_trained", 0),
+            anomalies_detected=stats.get("anomalies_detected", 0),
+            anomaly_rate=stats.get("anomaly_rate", 0.0),
+            message="Model trained successfully",
+        )
+    except Exception as e:
+        return MLTrainingResponse(
+            success=False,
+            message=f"Training error: {str(e)}",
+        )
+
+
+@app.post("/api/v1/ml/predict", response_model=MLPredictionResponse)
+async def predict_threat(event: TrafficEvent) -> MLPredictionResponse:
+    """Get ML anomaly prediction for traffic event."""
+    try:
+        is_anomaly, confidence = threat_model.predict(event)
+        
+        # Generate recommendation
+        if is_anomaly:
+            if confidence > 0.8:
+                recommendation = "Critical: Immediate investigation required"
+            elif confidence > 0.6:
+                recommendation = "High: Schedule investigation within 1 hour"
+            else:
+                recommendation = "Medium: Monitor and collect additional data"
+        else:
+            recommendation = "Normal traffic pattern"
+
+        return MLPredictionResponse(
+            is_anomaly=is_anomaly,
+            confidence=confidence,
+            recommendation=recommendation,
+        )
+    except Exception as e:
+        return MLPredictionResponse(
+            is_anomaly=False,
+            confidence=0.0,
+            recommendation=f"Prediction error: {str(e)}",
+        )
 
 
 @app.websocket("/api/v1/stream")

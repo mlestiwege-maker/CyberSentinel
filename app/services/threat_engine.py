@@ -14,6 +14,7 @@ from app.models import (
     TrafficEvent,
     WeeklyReport,
 )
+from app.services.ml_threat_model import get_threat_model
 
 
 class ThreatEngine:
@@ -189,14 +190,22 @@ class ThreatEngine:
         geo_component = 0.22 if event.geo_anomaly else 0.0
         ua_component = event.user_agent_risk * 0.35
 
-        score = (
+        heuristic_score = (
             traffic_component * 0.36
             + login_component * 0.26
             + port_component
             + geo_component
             + ua_component
         )
-        return float(max(0.0, min(1.0, score)))
+
+        # Get ML model prediction
+        ml_model = get_threat_model()
+        _, ml_anomaly_confidence = ml_model.predict(event)
+
+        # Blend heuristic and ML scores (60% heuristic, 40% ML)
+        blended_score = heuristic_score * 0.6 + ml_anomaly_confidence * 0.4
+
+        return float(max(0.0, min(1.0, blended_score)))
 
     def _create_alert(self, event: TrafficEvent, score: float, event_time: datetime) -> ThreatAlert:
         self._sequence += 1

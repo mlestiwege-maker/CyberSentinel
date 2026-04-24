@@ -120,3 +120,40 @@ class PacketCaptureResponse(BaseModel):
     status: str  # "started", "stopped", "error"
     message: str
     details: PacketCaptureStatus | None = None
+
+
+class MLModelInfo(BaseModel):
+    """Information about ML threat detection model."""
+
+    model_name: str
+    version: str
+    features: list[str]
+    contamination: float | None
+    training_samples: int
+    last_training: str | None
+    anomaly_detection_method: str
+    status: str  # "trained" or "untrained"
+
+
+class MLTrainingRequest(BaseModel):
+    """Request to train ML model."""
+
+    training_events: int = 100  # Number of historical events to use
+
+
+class MLTrainingResponse(BaseModel):
+    """Response from ML model training."""
+
+    success: bool
+    events_trained: int = 0
+    anomalies_detected: int = 0
+    anomaly_rate: float = 0.0
+    message: str = ""
+
+
+class MLPredictionResponse(BaseModel):
+    """Response from ML anomaly prediction."""
+
+    is_anomaly: bool
+    confidence: float
+    recommendation: str
