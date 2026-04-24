@@ -8,6 +8,21 @@ import 'package:flutter/material.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  String _asString(Object? value, {String fallback = 'N/A'}) {
+    if (value == null) {
+      return fallback;
+    }
+    final text = value.toString();
+    return text.isEmpty ? fallback : text;
+  }
+
+  double _asDouble(Object? value, {double fallback = 0.0}) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
   Widget _buildConnectionBanner(BuildContext context, ThreatFeedService feed) {
     final connected = feed.isBackendConnected;
     final label = feed.connectionLabel;
@@ -154,6 +169,223 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildMlInsightsPanel(BuildContext context, ThreatFeedService feed) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final info = feed.mlModelInfo;
+    final scheduler = feed.mlSchedulerStatus;
+    final importance = feed.mlFeatureImportance;
+    final versions = feed.mlVersions;
+
+    final status = _asString(info?['status'], fallback: 'unavailable');
+    final activeVersion = _asString(info?['active_version']);
+    final samples = _asString(info?['training_samples'], fallback: '0');
+    final threshold = _asDouble(info?['alert_threshold']);
+    final schedulerEnabled = scheduler?['enabled'] == true;
+    final schedulerState = _asString(scheduler?['last_status'], fallback: 'idle');
+    final schedulerInterval = _asString(scheduler?['interval_seconds'], fallback: '-');
+
+    final importancesMap = (importance?['importances'] as Map?)
+            ?.map((key, value) => MapEntry(key.toString(), _asDouble(value))) ??
+        const <String, double>{};
+
+    final sortedImportance = importancesMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final versionItems = (versions?['versions'] as List?)?.cast<Map<String, dynamic>>() ??
+        const <Map<String, dynamic>>[];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.psychology_alt_outlined, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'ML Control Center',
+                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                FilledButton.tonalIcon(
+                  onPressed: () async {
+                    final ok = await feed.refreshMlInsights();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(ok ? 'ML insights refreshed' : 'ML insights refresh failed'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Refresh'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(
+                  avatar: Icon(
+                    status.toLowerCase() == 'trained' ? Icons.verified : Icons.warning_amber,
+                    size: 16,
+                    color: status.toLowerCase() == 'trained' ? scheme.primary : scheme.tertiary,
+                  ),
+                  label: Text('Status: $status'),
+                ),
+                Chip(label: Text('Active: $activeVersion')),
+                Chip(label: Text('Samples: $samples')),
+                Chip(label: Text('Threshold: ${threshold.toStringAsFixed(3)}')),
+                Chip(label: Text('Scheduler: ${schedulerEnabled ? 'ON' : 'OFF'} ($schedulerState)')),
+                Chip(label: Text('Interval: ${schedulerInterval}s')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: feed.isAdministrator
+                      ? () async {
+                          final ok = await feed.trainMlModel(trainingEvents: 100);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'ML retraining completed'
+                                    : 'ML retraining failed (see audit logs)'),
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  icon: const Icon(Icons.model_training_outlined, size: 18),
+                  label: const Text('Retrain Model'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: feed.isAdministrator
+                      ? () async {
+                          final ok = await feed.configureMlScheduler(
+                            enabled: !schedulerEnabled,
+                            intervalSeconds: 300,
+                            trainingEvents: 100,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Scheduler ${schedulerEnabled ? 'disabled' : 'enabled'}'
+                                    : 'Scheduler update failed'),
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  icon: Icon(
+                    schedulerEnabled ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                    size: 18,
+                  ),
+                  label: Text(schedulerEnabled ? 'Disable Scheduler' : 'Enable Scheduler'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: feed.isAdministrator
+                      ? () async {
+                          final ok = await feed.tuneMlThreshold(targetFalsePositiveRate: 0.20);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Threshold tuning completed'
+                                    : 'Threshold tuning failed'),
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Tune Threshold'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Feature Importance (SHAP / fallback)',
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            if (sortedImportance.isEmpty)
+              Text('No feature importance available yet. Train the model first.', style: textTheme.bodySmall)
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: sortedImportance.take(5).map((entry) {
+                  return Chip(
+                    label: Text('${entry.key}: ${(entry.value * 100).toStringAsFixed(1)}%'),
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              'A/B Model Versions',
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            if (versionItems.isEmpty)
+              Text('No model versions available yet.', style: textTheme.bodySmall)
+            else
+              Column(
+                children: versionItems.take(4).map((version) {
+                  final versionId = _asString(version['version_id']);
+                  final isActive = version['is_active'] == true;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      isActive ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      color: isActive ? scheme.primary : null,
+                    ),
+                    title: Text('$versionId (slot ${_asString(version['slot'])})'),
+                    subtitle: Text(
+                      'Samples ${_asString(version['training_samples'])} · '
+                      'Anomaly ${(100 * _asDouble(version['anomaly_rate'])).toStringAsFixed(1)}%',
+                    ),
+                    trailing: isActive
+                        ? const Text('Active')
+                        : TextButton(
+                            onPressed: feed.isAdministrator
+                                ? () async {
+                                    final ok = await feed.switchMlVersion(versionId);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(ok
+                                              ? 'Switched active model to $versionId'
+                                              : 'Version switch failed'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null,
+                            child: const Text('Activate'),
+                          ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final feed = ThreatFeedService();
@@ -201,6 +433,8 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _buildMetrics(context),
+                    const SizedBox(height: 16),
+                    _buildMlInsightsPanel(context, feed),
                     const SizedBox(height: 16),
                     if (isWide)
                       Row(

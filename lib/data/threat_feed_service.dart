@@ -176,6 +176,11 @@ class ThreatFeedService extends ChangeNotifier {
   int _pollTick = 0;
   DateTime? _lastSyncAt;
   ThreatSummary? _cachedSummary;
+  Map<String, dynamic>? _mlModelInfo;
+  Map<String, dynamic>? _mlSchedulerStatus;
+  Map<String, dynamic>? _mlFeatureImportance;
+  Map<String, dynamic>? _mlVersions;
+  DateTime? _mlLastUpdatedAt;
   int _sequence = 0;
   UserRole _currentUserRole = UserRole.administrator;
 
@@ -214,6 +219,7 @@ class ThreatFeedService extends ChangeNotifier {
     _seedInitialData();
     if (!_isFlutterTestEnvironment()) {
       unawaited(_refreshFromBackend(notify: true));
+      unawaited(refreshMlInsights());
       _connectWebSocket();
 
       _timer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -300,6 +306,16 @@ class ThreatFeedService extends ChangeNotifier {
 
     return _computeSummary();
   }
+
+  Map<String, dynamic>? get mlModelInfo => _mlModelInfo;
+
+  Map<String, dynamic>? get mlSchedulerStatus => _mlSchedulerStatus;
+
+  Map<String, dynamic>? get mlFeatureImportance => _mlFeatureImportance;
+
+  Map<String, dynamic>? get mlVersions => _mlVersions;
+
+  DateTime? get mlLastUpdatedAt => _mlLastUpdatedAt;
 
   bool get isBackendConnected => _backendHealthy;
 
@@ -461,6 +477,171 @@ class ThreatFeedService extends ChangeNotifier {
     } catch (e) {
       _logAudit(
         action: 'Packet Capture Stop',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> refreshMlInsights() async {
+    try {
+      final responses = await Future.wait([
+        _apiClient.fetchMlModelInfo(),
+        _apiClient.fetchMlSchedulerStatus(),
+        _apiClient.fetchMlFeatureImportance(),
+        _apiClient.fetchMlModelVersions(),
+      ]);
+
+      _mlModelInfo = responses[0];
+      _mlSchedulerStatus = responses[1];
+      _mlFeatureImportance = responses[2];
+      _mlVersions = responses[3];
+      _mlLastUpdatedAt = DateTime.now();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'ML Insights Refresh',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> trainMlModel({int trainingEvents = 100}) async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'ML Model Train',
+        outcome: 'Denied',
+        details: 'Only administrators can train ML model.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final response = await _apiClient.trainMlModel(trainingEvents: trainingEvents);
+      await refreshMlInsights();
+      _logAudit(
+        action: 'ML Model Train',
+        outcome: (response['success'] == true) ? 'Success' : 'Failed',
+        details: (response['message'] ?? 'Training request completed').toString(),
+      );
+      notifyListeners();
+      return response['success'] == true;
+    } catch (e) {
+      _logAudit(
+        action: 'ML Model Train',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> configureMlScheduler({
+    required bool enabled,
+    int intervalSeconds = 300,
+    int trainingEvents = 100,
+  }) async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'ML Scheduler Configure',
+        outcome: 'Denied',
+        details: 'Only administrators can configure retraining scheduler.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      _mlSchedulerStatus = await _apiClient.configureMlScheduler(
+        enabled: enabled,
+        intervalSeconds: intervalSeconds,
+        trainingEvents: trainingEvents,
+      );
+      _mlLastUpdatedAt = DateTime.now();
+      _logAudit(
+        action: 'ML Scheduler Configure',
+        outcome: 'Success',
+        details: 'Scheduler ${enabled ? 'enabled' : 'disabled'} with ${intervalSeconds}s interval.',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'ML Scheduler Configure',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> tuneMlThreshold({double targetFalsePositiveRate = 0.20}) async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'ML Threshold Tune',
+        outcome: 'Denied',
+        details: 'Only administrators can tune ML threshold.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final response = await _apiClient.tuneMlThreshold(
+        targetFalsePositiveRate: targetFalsePositiveRate,
+      );
+      await refreshMlInsights();
+      _logAudit(
+        action: 'ML Threshold Tune',
+        outcome: 'Success',
+        details: (response['message'] ?? 'Threshold tuned').toString(),
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'ML Threshold Tune',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> switchMlVersion(String versionId) async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'ML Model Switch',
+        outcome: 'Denied',
+        details: 'Only administrators can switch model versions.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      _mlVersions = await _apiClient.switchMlModelVersion(versionId: versionId);
+      await refreshMlInsights();
+      _logAudit(
+        action: 'ML Model Switch',
+        outcome: 'Success',
+        details: 'Switched active model to version $versionId.',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'ML Model Switch',
         outcome: 'Failed',
         details: e.toString(),
       );

@@ -161,6 +161,102 @@ class BackendApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> fetchMlModelInfo() async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/model/info');
+    final response = await _sendWithResilience(() => http.get(uri));
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> trainMlModel({int trainingEvents = 100}) async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/model/train');
+    final response = await _sendWithResilience(
+      () => http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'training_events': trainingEvents}),
+      ),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fetchMlSchedulerStatus() async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/scheduler/status');
+    final response = await _sendWithResilience(() => http.get(uri));
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> configureMlScheduler({
+    required bool enabled,
+    required int intervalSeconds,
+    required int trainingEvents,
+  }) async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/scheduler/configure');
+    final response = await _sendWithResilience(
+      () => http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(
+          {
+            'enabled': enabled,
+            'interval_seconds': intervalSeconds,
+            'training_events': trainingEvents,
+          },
+        ),
+      ),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fetchMlFeatureImportance() async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/feature-importance');
+    final response = await _sendWithResilience(() => http.get(uri));
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> tuneMlThreshold({
+    required double targetFalsePositiveRate,
+  }) async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/threshold/tune');
+    final response = await _sendWithResilience(
+      () => http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(
+          {'target_false_positive_rate': targetFalsePositiveRate},
+        ),
+      ),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fetchMlModelVersions() async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/model/versions');
+    final response = await _sendWithResilience(() => http.get(uri));
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> switchMlModelVersion({
+    required String versionId,
+  }) async {
+    final uri = _baseUri.replace(path: '/api/v1/ml/model/switch');
+    final response = await _sendWithResilience(
+      () => http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'version_id': versionId}),
+      ),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> fetchResilienceStats() async {
     try {
       final uri = _baseUri.replace(path: '/api/v1/health/resilience');
