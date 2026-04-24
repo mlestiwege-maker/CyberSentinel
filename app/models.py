@@ -157,3 +157,72 @@ class MLPredictionResponse(BaseModel):
     is_anomaly: bool
     confidence: float
     recommendation: str
+
+
+class MLSchedulerConfigRequest(BaseModel):
+    """Request to configure background ML retraining scheduler."""
+
+    enabled: bool = True
+    interval_seconds: int = Field(default=300, ge=30, le=86400)
+    training_events: int = Field(default=100, ge=10, le=1000)
+
+
+class MLSchedulerStatusResponse(BaseModel):
+    """Current state of background ML retraining scheduler."""
+
+    enabled: bool
+    interval_seconds: int
+    training_events: int
+    is_running: bool
+    last_run: str | None = None
+    last_status: str = "idle"
+    last_error: str | None = None
+
+
+class MLThresholdTuneRequest(BaseModel):
+    """Request to tune anomaly threshold by target false-positive rate."""
+
+    target_false_positive_rate: float = Field(default=0.20, ge=0.01, le=0.80)
+
+
+class MLThresholdTuneResponse(BaseModel):
+    """Response from automatic threshold tuning."""
+
+    old_threshold: float
+    new_threshold: float
+    observed_false_positive_rate: float
+    target_false_positive_rate: float
+    message: str
+
+
+class MLFeatureImportanceResponse(BaseModel):
+    """Feature importance analysis response."""
+
+    method: str
+    sample_size: int
+    importances: dict[str, float]
+
+
+class MLModelVersionInfo(BaseModel):
+    """Metadata for a trained ML model version."""
+
+    version_id: str
+    slot: str
+    trained_at: str
+    training_samples: int
+    anomaly_rate: float
+    threshold: float
+    is_active: bool
+
+
+class MLModelVersionsResponse(BaseModel):
+    """Model versioning and A/B state."""
+
+    active_version: str | None
+    versions: list[MLModelVersionInfo]
+
+
+class MLSwitchVersionRequest(BaseModel):
+    """Request to switch active model version."""
+
+    version_id: str

@@ -93,6 +93,8 @@ class ThreatEngine:
     async def ingest(self, event: TrafficEvent) -> IngestResponse:
         event_time = self._as_utc(event.timestamp)
         score = self._score_event(event)
+        ml_model = get_threat_model()
+        alert_threshold = ml_model.get_alert_threshold()
         metric = NetworkMetric(
             time=event_time,
             packets_per_second=max(1000, int((event.bytes_in + event.bytes_out) / 7)),
@@ -101,7 +103,7 @@ class ThreatEngine:
         )
         self._append_metric(metric)
 
-        alert_generated = score >= settings.alert_anomaly_threshold
+        alert_generated = score >= alert_threshold
         alert_id: str | None = None
 
         if alert_generated:

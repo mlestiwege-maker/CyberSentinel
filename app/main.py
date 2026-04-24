@@ -13,8 +13,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.models import (
     IngestResponse,
+    MLFeatureImportanceResponse,
     MLModelInfo,
+    MLModelVersionsResponse,
     MLPredictionResponse,
+    MLSchedulerConfigRequest,
+    MLSchedulerStatusResponse,
+    MLSwitchVersionRequest,
+    MLThresholdTuneRequest,
+    MLThresholdTuneResponse,
+    MLModelVersionInfo,
     MLTrainingRequest,
     MLTrainingResponse,
     NetworkMetric,
@@ -44,11 +52,24 @@ feature_extractor = FeatureExtractor()
 packet_sniffer = get_sniffer()
 threat_model = get_threat_model()
 
+_ml_scheduler_task: asyncio.Task | None = None
+_ml_scheduler_state: dict[str, object] = {
+    "enabled": False,
+    "interval_seconds": 300,
+    "training_events": 100,
+    "is_running": False,
+    "last_run": None,
+    "last_status": "idle",
+    "last_error": None,
+}
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await engine.start()
+    _start_ml_scheduler()
     yield
+    await _stop_ml_scheduler()
     await engine.stop()
 
 
@@ -62,6 +83,82 @@ def process_packet_features(features) -> None:
         asyncio.create_task(engine.ingest(event))
     except Exception as e:
         pass  # Silently fail to avoid blocking packet sniffer
+
+
+def _alerts_to_training_events(limit: int) -> list[TrafficEvent]:
+    """Convert recent alerts into synthetic training events for ML retraining."""
+    recent_alerts = engine.get_alerts()[:limit]
+    events: list[TrafficEvent] = []
+    for alert in recent_alerts:
+        events.append(
+            TrafficEvent(
+                source_ip=alert.source_ip,
+                destination_ip="172.16.254.1",
+                protocol="TCP",
+                destination_port=445,
+                bytes_in=150000 + int(alert.confidence * 100000),
+                bytes_out=120000 + int(alert.confidence * 80000),
+                failed_logins=int(alert.confidence * 5),
+                geo_anomaly=alert.severity in {"Critical", "High"},
+                user_agent_risk=alert.confidence,
+                timestamp=alert.time,
+            )
+        )
+    return events
+
+
+async def _ml_scheduler_loop() -> None:
+    """Background scheduler that periodically retrains the ML model."""
+    _ml_scheduler_state["is_running"] = True
+    try:
+        while True:
+            interval = int(_ml_scheduler_state.get("interval_seconds", 300))
+            await asyncio.sleep(max(30, interval))
+
+            if not bool(_ml_scheduler_state.get("enabled", False)):
+                continue
+
+            training_events = int(_ml_scheduler_state.get("training_events", 100))
+            events = _alerts_to_training_events(training_events)
+            if len(events) < 10:
+                _ml_scheduler_state["last_run"] = datetime.now().isoformat()
+                _ml_scheduler_state["last_status"] = "skipped"
+                _ml_scheduler_state["last_error"] = "Insufficient events for retraining (need 10+)"
+                continue
+
+            stats = threat_model.train(events)
+            _ml_scheduler_state["last_run"] = datetime.now().isoformat()
+            if "error" in stats:
+                _ml_scheduler_state["last_status"] = "failed"
+                _ml_scheduler_state["last_error"] = str(stats.get("error"))
+            else:
+                _ml_scheduler_state["last_status"] = "succeeded"
+                _ml_scheduler_state["last_error"] = None
+    except asyncio.CancelledError:
+        raise
+    finally:
+        _ml_scheduler_state["is_running"] = False
+
+
+def _start_ml_scheduler() -> None:
+    """Start background ML scheduler if not running."""
+    global _ml_scheduler_task
+    if _ml_scheduler_task is not None and not _ml_scheduler_task.done():
+        return
+    _ml_scheduler_task = asyncio.create_task(_ml_scheduler_loop())
+
+
+async def _stop_ml_scheduler() -> None:
+    """Stop background ML scheduler task."""
+    global _ml_scheduler_task
+    if _ml_scheduler_task is None:
+        return
+    _ml_scheduler_task.cancel()
+    try:
+        await _ml_scheduler_task
+    except asyncio.CancelledError:
+        pass
+    _ml_scheduler_task = None
 
 
 app = FastAPI(title=settings.app_name, version="0.2.0", lifespan=lifespan)
@@ -287,31 +384,13 @@ async def get_ml_model_info() -> MLModelInfo:
 async def train_ml_model(request: MLTrainingRequest) -> MLTrainingResponse:
     """Train ML model on historical threat events."""
     try:
-        # Get recent alerts with consistent failures
-        recent_alerts = engine.get_alerts()[:request.training_events]
-        
-        if len(recent_alerts) < 10:
+        training_events = _alerts_to_training_events(request.training_events)
+
+        if len(training_events) < 10:
             return MLTrainingResponse(
                 success=False,
-                message=f"Insufficient training data: {len(recent_alerts)} alerts (need 10+)",
+                message=f"Insufficient training data: {len(training_events)} alerts (need 10+)",
             )
-
-        # Convert alerts back to traffic events (synthetic representation)
-        training_events: list[TrafficEvent] = []
-        for alert in recent_alerts:
-            event = TrafficEvent(
-                source_ip=alert.source_ip,
-                destination_ip="172.16.254.1",
-                protocol="TCP",
-                destination_port=445,
-                bytes_in=150000 + (int(alert.confidence * 100000)),
-                bytes_out=120000 + (int(alert.confidence * 80000)),
-                failed_logins=int(alert.confidence * 5),
-                geo_anomaly=alert.severity in {"Critical", "High"},
-                user_agent_risk=alert.confidence,
-                timestamp=alert.time,
-            )
-            training_events.append(event)
 
         # Train model
         stats = threat_model.train(training_events)
@@ -327,7 +406,10 @@ async def train_ml_model(request: MLTrainingRequest) -> MLTrainingResponse:
             events_trained=stats.get("events_trained", 0),
             anomalies_detected=stats.get("anomalies_detected", 0),
             anomaly_rate=stats.get("anomaly_rate", 0.0),
-            message="Model trained successfully",
+            message=(
+                f"Model trained successfully "
+                f"(version={stats.get('version_id', 'n/a')}, slot={stats.get('slot', 'n/a')})"
+            ),
         )
     except Exception as e:
         return MLTrainingResponse(
@@ -364,6 +446,74 @@ async def predict_threat(event: TrafficEvent) -> MLPredictionResponse:
             confidence=0.0,
             recommendation=f"Prediction error: {str(e)}",
         )
+
+
+@app.get("/api/v1/ml/scheduler/status", response_model=MLSchedulerStatusResponse)
+async def get_ml_scheduler_status() -> MLSchedulerStatusResponse:
+    """Get current status of async ML retraining scheduler."""
+    return MLSchedulerStatusResponse(**_ml_scheduler_state)
+
+
+@app.post("/api/v1/ml/scheduler/configure", response_model=MLSchedulerStatusResponse)
+async def configure_ml_scheduler(payload: MLSchedulerConfigRequest) -> MLSchedulerStatusResponse:
+    """Configure async ML retraining scheduler behavior."""
+    _ml_scheduler_state["enabled"] = payload.enabled
+    _ml_scheduler_state["interval_seconds"] = payload.interval_seconds
+    _ml_scheduler_state["training_events"] = payload.training_events
+    _ml_scheduler_state["last_status"] = "configured"
+    _ml_scheduler_state["last_error"] = None
+    return MLSchedulerStatusResponse(**_ml_scheduler_state)
+
+
+@app.get("/api/v1/ml/feature-importance", response_model=MLFeatureImportanceResponse)
+async def get_ml_feature_importance() -> MLFeatureImportanceResponse:
+    """Get SHAP-style feature importance for active model version."""
+    details = threat_model.get_feature_importance()
+    return MLFeatureImportanceResponse(**details)
+
+
+@app.post("/api/v1/ml/threshold/tune", response_model=MLThresholdTuneResponse)
+async def tune_ml_threshold(payload: MLThresholdTuneRequest) -> MLThresholdTuneResponse:
+    """Automatically tune alert threshold based on observed false-positive rate."""
+    tuned = threat_model.tune_threshold(
+        target_false_positive_rate=payload.target_false_positive_rate,
+        alerts=engine.get_alerts(),
+    )
+    return MLThresholdTuneResponse(**tuned)
+
+
+@app.get("/api/v1/ml/model/versions", response_model=MLModelVersionsResponse)
+async def get_ml_model_versions() -> MLModelVersionsResponse:
+    """Get trained model versions and current active version."""
+    versions_data = threat_model.get_model_versions()
+    return MLModelVersionsResponse(
+        active_version=versions_data.get("active_version"),
+        versions=[MLModelVersionInfo(**item) for item in versions_data.get("versions", [])],
+    )
+
+
+@app.post("/api/v1/ml/model/switch", response_model=MLModelVersionsResponse)
+async def switch_ml_model_version(payload: MLSwitchVersionRequest) -> MLModelVersionsResponse:
+    """Switch active model version for inference (A/B testing support)."""
+    switched = threat_model.switch_active_version(payload.version_id)
+    if not switched:
+        versions_data = threat_model.get_model_versions()
+        return MLModelVersionsResponse(
+            active_version=versions_data.get("active_version"),
+            versions=[MLModelVersionInfo(**item) for item in versions_data.get("versions", [])],
+        )
+
+    versions_data = threat_model.get_model_versions()
+    return MLModelVersionsResponse(
+        active_version=versions_data.get("active_version"),
+        versions=[MLModelVersionInfo(**item) for item in versions_data.get("versions", [])],
+    )
+
+
+@app.post("/api/v1/ml/model/ab-test")
+async def run_ml_ab_test(event: TrafficEvent) -> dict:
+    """Run A/B prediction for a traffic event against latest A and B versions."""
+    return threat_model.predict_ab(event)
 
 
 @app.websocket("/api/v1/stream")
