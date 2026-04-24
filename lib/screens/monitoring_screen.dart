@@ -15,12 +15,48 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   bool _drillRunning = false;
   bool _notifyRunning = false;
   bool _syncRunning = false;
+  bool _captureRunning = false;
+  String _captureStatus = "";
 
   String _timeLabel(DateTime dateTime) {
     final hh = dateTime.hour.toString().padLeft(2, '0');
     final mm = dateTime.minute.toString().padLeft(2, '0');
     final ss = dateTime.second.toString().padLeft(2, '0');
     return '$hh:$mm:$ss';
+  }
+
+  Future<void> _togglePacketCapture(ThreatFeedService feed) async {
+    if (_captureRunning) {
+      // Stop capture
+      setState(() => _captureRunning = true);
+      final result = await feed.stopPacketCapture();
+      if (!mounted) return;
+      setState(() {
+        _captureRunning = false;
+        _captureStatus = result ? "Capture stopped" : "Failed to stop capture";
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_captureStatus),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // Start capture
+      setState(() => _captureRunning = true);
+      final result = await feed.startPacketCapture();
+      if (!mounted) return;
+      setState(() {
+        _captureRunning = false;
+        _captureStatus = result ? "Capture started - monitoring real network traffic" : "Failed to start capture";
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_captureStatus),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _runDrill(ThreatFeedService feed) async {
@@ -219,6 +255,23 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                                   )
                                 : const Icon(Icons.notifications_active_outlined),
                             label: const Text('Test Notification Channels'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: _captureRunning || !feed.isAdministrator
+                                ? null
+                                : () => _togglePacketCapture(feed),
+                            icon: _captureRunning
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(_captureStatus.contains("started") 
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.fiber_smart_record),
+                            label: Text(_captureStatus.contains("started") 
+                                ? 'Stop Capture'
+                                : 'Capture Real Traffic'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _syncRunning ? null : () => _forceSync(feed),

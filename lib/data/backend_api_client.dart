@@ -139,6 +139,28 @@ class BackendApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> startPacketCapture() async {
+    final uri = _baseUri.replace(path: '/api/v1/capture/start');
+    final response = await _sendWithResilience(
+      () => http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'interface': null}),
+      ),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> stopPacketCapture() async {
+    final uri = _baseUri.replace(path: '/api/v1/capture/stop');
+    final response = await _sendWithResilience(
+      () => http.post(uri, headers: {'Content-Type': 'application/json'}),
+    );
+    _ensureSuccess(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> fetchResilienceStats() async {
     try {
       final uri = _baseUri.replace(path: '/api/v1/health/resilience');

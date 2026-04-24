@@ -407,6 +407,68 @@ class ThreatFeedService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> startPacketCapture() async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'Packet Capture Start',
+        outcome: 'Denied',
+        details: 'Only administrators can start packet capture.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      await _apiClient.startPacketCapture();
+      _logAudit(
+        action: 'Packet Capture Start',
+        outcome: 'Success',
+        details: 'Real-time network packet capture initiated. Monitoring live network traffic.',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'Packet Capture Start',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> stopPacketCapture() async {
+    if (!isAdministrator) {
+      _logAudit(
+        action: 'Packet Capture Stop',
+        outcome: 'Denied',
+        details: 'Only administrators can stop packet capture.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      await _apiClient.stopPacketCapture();
+      _logAudit(
+        action: 'Packet Capture Stop',
+        outcome: 'Success',
+        details: 'Real-time packet capture stopped.',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logAudit(
+        action: 'Packet Capture Stop',
+        outcome: 'Failed',
+        details: e.toString(),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
   void setUserRole(UserRole role) {
     if (_currentUserRole == role) {
       return;
