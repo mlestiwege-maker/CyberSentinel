@@ -141,7 +141,7 @@ class MLThreatDetectionModel:
             # score ranges from -1 (most anomalous) to 0 (normal)
             anomaly_confidence = max(0.0, min(1.0, (-score) / 2.0))
 
-            return is_anomaly, anomaly_confidence
+            return bool(is_anomaly), float(anomaly_confidence)
         except Exception:
             return False, 0.0
 
@@ -357,15 +357,15 @@ class MLThreatDetectionModel:
             a_anomaly, a_conf = self.predict(event, version_id=slot_a["version_id"])
             result["A"] = {
                 "version_id": slot_a["version_id"],
-                "is_anomaly": a_anomaly,
-                "confidence": round(a_conf, 4),
+                "is_anomaly": bool(a_anomaly),
+                "confidence": float(round(a_conf, 4)),
             }
         if slot_b is not None:
             b_anomaly, b_conf = self.predict(event, version_id=slot_b["version_id"])
             result["B"] = {
                 "version_id": slot_b["version_id"],
-                "is_anomaly": b_anomaly,
-                "confidence": round(b_conf, 4),
+                "is_anomaly": bool(b_anomaly),
+                "confidence": float(round(b_conf, 4)),
             }
 
         return result
