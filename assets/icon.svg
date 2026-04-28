@@ -1,0 +1,59 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer glow/shadow -->
+  <defs>
+    <radialGradient id="shieldGradient" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F7931E;stop-opacity:1" />
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0F1419"/>
+
+  <!-- Shield base with gradient -->
+  <path d="M 256 80 L 380 140 L 380 290 C 380 390 256 430 256 430 C 256 430 132 390 132 290 L 132 140 Z" 
+        fill="url(#shieldGradient)" filter="url(#shadow)"/>
+
+  <!-- Shield border highlight -->
+  <path d="M 256 80 L 380 140 L 380 290 C 380 390 256 430 256 430 C 256 430 132 390 132 290 L 132 140 Z" 
+        fill="none" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Center circle (radar target) -->
+  <circle cx="256" cy="260" r="70" fill="rgba(255, 255, 255, 0.1)" stroke="#00FF88" stroke-width="2"/>
+
+  <!-- Radar rings -->
+  <circle cx="256" cy="260" r="50" fill="none" stroke="#00FF88" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="256" cy="260" r="30" fill="none" stroke="#00FF88" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- Center threat dot (red pulse) -->
+  <circle cx="256" cy="260" r="12" fill="#FF6B35"/>
+  <circle cx="256" cy="260" r="12" fill="#FF6B35" opacity="0.3" r="20"/>
+
+  <!-- Crosshair threat indicator -->
+  <g stroke="#00FF88" stroke-width="2" opacity="0.9">
+    <line x1="256" y1="230" x2="256" y2="205" stroke-linecap="round"/>
+    <line x1="256" y1="290" x2="256" y2="315" stroke-linecap="round"/>
+    <line x1="226" y1="260" x2="201" y2="260" stroke-linecap="round"/>
+    <line x1="286" y1="260" x2="311" y2="260" stroke-linecap="round"/>
+  </g>
+
+  <!-- Cyber lock accent (top right) -->
+  <g fill="none" stroke="#00FF88" stroke-width="1.5" opacity="0.7">
+    <rect x="330" y="120" width="20" height="18" rx="2"/>
+    <circle cx="340" cy="135" r="3" fill="#00FF88"/>
+  </g>
+
+  <!-- Top glow text effect (optional text overlay can be added) -->
+  <text x="256" y="480" font-family="Arial, sans-serif" font-size="24" font-weight="bold" 
+        text-anchor="middle" fill="#00FF88" opacity="0.7">CYBERSENTINEL</text>
+</svg>

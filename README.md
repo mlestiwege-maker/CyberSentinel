@@ -1,53 +1,277 @@
-# CyberSentinel Frontend (Flutter)
+# CyberSentinel
 
-CyberSentinel is a desktop/mobile cyberattack detection and threat monitoring system designed for financial institutions.
+A comprehensive, real-time cybersecurity threat detection and incident response platform featuring a dark-themed SOC (Security Operations Center) dashboard, advanced threat modeling, and multi-channel alerting.
 
-## Problem Context
+**Live Branches:**
+- `main` — production-ready monorepo (frontend + backend)
+- `backend-main` — backend-only development branch
+- `monorepo-backend-merge` — merge PR reference
 
-Zimbabwean financial institutions are rapidly digitizing (online banking, mobile banking, and electronic payments), increasing both operational efficiency and cyber risk. Traditional security systems often depend on fixed rules and known signatures, which are weak against evolving threats such as:
+---
 
-- Zero-day exploits
-- Ransomware
-- Distributed Denial of Service (DDoS)
-- Advanced fraud and lateral movement patterns
+## 📦 Project Structure
 
-This project focuses on a banking context (e.g., CBZ Bank Bindura Branch as a case-study environment) where fast and accurate cyber threat detection is critical.
+```
+CyberSentinel/
+├── lib/                           # Flutter frontend (Dart)
+│   ├── main.dart
+│   ├── screens/                   # Dashboard, terminal, alerts, incidents, reports, monitoring, settings
+│   ├── widgets/                   # Reusable UI components (shell, drawer, KPI strip, graphs, tables)
+│   └── data/                      # API clients, threat feed service, auth/incident data models
+├── backend/                       # FastAPI backend (Python)
+│   ├── app/
+│   │   ├── main.py                # FastAPI app with auth, RBAC, threat detection
+│   │   ├── config.py              # Environment settings
+│   │   ├── models.py              # Pydantic data models
+│   │   ├── services/              # Auth, notifications, packet sniffing, threat modeling, DLQ, resilience
+│   │   └── models/                # ML threat model artifacts
+│   ├── tests/                     # Comprehensive unit tests (auth, features, DLQ, idempotency, notifications)
+│   └── requirements.txt           # Python dependencies
+├── pubspec.yaml                   # Flutter dependencies
+├── android/, ios/, linux/, windows/, web/  # Platform-specific build configs
+└── test/                          # Flutter widget tests
 
-## Aim
+```
 
-Develop a desktop and mobile-based Cyberattack Detection and Threat Monitoring System that uses intelligent techniques to monitor network traffic, detect anomalies in real time, and send actionable alerts to administrators.
+---
 
-## Objectives
+## 🎯 Key Features
 
-1. Capture and preprocess network traffic from a simulated banking environment.
-2. Apply machine learning/anomaly detection models to identify suspicious behavior.
-3. Classify anomalies and generate real-time alerts.
-4. Provide Flutter-based desktop and mobile dashboards for SOC monitoring.
-5. Evaluate detection performance for known and emerging threats.
+### Frontend (Flutter)
+- **Dark SOC Dashboard** — Real-time threat feeds, incident overview, attack map, system resources
+- **Operational Terminal** — Command-based threat operations (drills, packet capture, ML tuning)
+- **Multi-screen UI** — Alerts, incidents, reports, monitoring, settings with unified navigation
+- **Responsive Design** — Works on desktop (Linux, macOS, Windows), web, iOS, Android
+- **Theme Support** — Light/dark theme toggle with optimized contrast
 
-## Current Frontend Capabilities
+### Backend (FastAPI)
+- **JWT Authentication & RBAC** — Role-based access control (admin, analyst, responder)
+- **Real-time Threat Detection** — ML-powered anomaly detection with configurable thresholds
+- **Multi-channel Notifications** — Email, SMS (Twilio), Slack, Teams, Firebase Cloud Messaging, system alerts
+- **Packet Sniffing & Feature Extraction** — Network-level threat detection
+- **Dead-Letter Queue (DLQ) & Idempotency** — Resilient event processing
+- **Circuit Breaker & Stats Collector** — Health monitoring and resilience metrics
+- **Incident Response Workflows** — Playbooks, assignment, status tracking
 
-The Flutter app now provides a SOC UI connected to the Phase 2 backend (REST + WebSocket), with simulation fallback when backend is unavailable:
+---
 
-- **Dashboard**: real-time KPIs, trend graph, and latest threat alerts.
-- **Alerts**: searchable/filterable threat feed with details view.
-- **Monitoring**: live packet/anomaly metric table for network visibility.
-- **Reports, Incidents, Settings**: management and response workflow views.
-- **Cross-platform UI**: responsive navigation for desktop and mobile layouts.
-- **Expert admin workflow**: operations console for threat drills, notification-channel tests, and manual sync.
+## 🚀 Quick Start
 
-## Architecture (Implemented Frontend Layer)
+### Backend Setup
 
-The app includes a reusable live threat feed stack:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # or: venv\Scripts\activate (Windows)
+pip install -r requirements.txt
+```
 
-- `lib/data/backend_api_client.dart`
-	- Handles backend REST requests for summary, alerts, and metrics.
-	- Builds WebSocket stream URL.
-	- Supports `--dart-define=BACKEND_BASE_URL=...` override.
-	- Includes timeout/retry logic and circuit-breaker protection for resilient operations.
+**Configure `.env`:**
+```bash
+cp .env .env.local
+# Edit .env.local with your settings:
+# - SMTP credentials for email alerts
+# - Twilio SID/token for SMS
+# - Firebase project ID for push notifications
+# - Auth secrets and role passwords
+```
 
-- `lib/data/threat_feed_service.dart`
-	- Syncs with backend APIs and `/api/v1/stream` updates.
+**Run the backend:**
+```bash
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Backend API docs: http://localhost:8000/docs
+
+### Frontend Setup
+
+```bash
+pub get
+flutter pub get
+```
+
+**Run Flutter:**
+```bash
+# Web
+flutter run -d web
+
+# Linux desktop
+flutter run -d linux
+
+# macOS
+flutter run -d macos
+
+# iOS
+flutter run -d ios
+
+# Android
+flutter run -d android
+```
+
+---
+
+## 🧪 Testing
+
+### Backend Tests
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+Tests cover:
+- Authentication and RBAC
+- Notification channels (email, SMS, Slack, Teams, FCM)
+- Packet feature extraction
+- Dead-letter queue recovery
+- Event idempotency
+
+### Frontend Tests
+
+```bash
+flutter test
+```
+
+Widget tests validate:
+- App navigation and routing
+- Dashboard panels and KPI display
+- Threat feed updates
+- Terminal command handling
+
+---
+
+## 🔧 Configuration
+
+### Backend Environment (`.env`)
+
+```env
+# App
+APP_NAME=CyberSentinel Backend
+APP_ENV=development
+SIMULATION_ENABLED=true
+
+# Threat Detection Thresholds
+ALERT_ANOMALY_THRESHOLD=0.78
+ALERT_CRITICAL_THRESHOLD=0.90
+
+# Notifications
+NOTIFY_EMAIL=security-admin@example.com
+NOTIFY_PHONE=
+NOTIFY_PUSH_TOPIC=cybersentinel-alerts
+
+# SMTP (Email)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+
+# Twilio (SMS)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+
+# Firebase (Push)
+FIREBASE_CREDENTIALS_PATH=
+FIREBASE_PROJECT_ID=cybersentinel-3dd13
+
+# Auth / RBAC
+AUTH_ENFORCED=true
+AUTH_SECRET_KEY=change-me-in-env
+AUTH_ADMIN_PASSWORD=admin123
+AUTH_RESPONDER_PASSWORD=responder123
+AUTH_ANALYST_PASSWORD=analyst123
+```
+
+### Frontend Configuration
+
+Theme and API base URL are configurable in `lib/main.dart`:
+```dart
+// API_BASE_URL defaults to http://localhost:8000
+// Theme defaults to dark; toggle via settings screen
+```
+
+---
+
+## 📱 Deployment
+
+### Docker (Backend)
+
+```bash
+cd backend
+docker build -t cybersentinel-backend .
+docker run -p 8000:8000 --env-file .env cybersentinel-backend
+```
+
+### Flutter Web Build
+
+```bash
+flutter build web --release
+# Deploy contents of build/web to your hosting
+```
+
+### Linux Desktop Build
+
+```bash
+flutter build linux --release
+# Outputs to build/linux/x64/release/bundle/
+```
+
+---
+
+## 📊 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      CyberSentinel App                       │
+│  (Flutter: Desktop, Web, Mobile)                             │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ HTTP/REST
+┌──────────────────────▼──────────────────────────────────────┐
+│                  FastAPI Backend                             │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │ Auth Service (JWT, RBAC) → Feature Extractor           │ │
+│  │ Threat Engine (ML) → Incident Response Workflows       │ │
+│  │ Notification Service (Multi-Channel)                   │ │
+│  │ Packet Sniffer → Resilience Collector & DLQ Recovery   │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Security & Compliance
+
+- **Sanitized Credentials** — `.env` does not include live secrets
+- **Git Ignore** — Python cache (`__pycache__/`), venv, logs automatically excluded
+- **JWT + RBAC** — All API endpoints protected by role-based access
+- **Notification Anti-Spam** — Cooldown and deduplication on alert channels
+- **Input Validation** — Pydantic models for strict API contract enforcement
+
+---
+
+## 📝 License
+
+Your organization's license here.
+
+---
+
+## 🤝 Contributing
+
+1. Create a branch: `git checkout -b feature/<name>`
+2. Make changes and commit: `git commit -am "description"`
+3. Push to remote: `git push origin feature/<name>`
+4. Open a pull request against `main`
+
+---
+
+## 📞 Support & Feedback
+
+For issues, questions, or feature requests, please open a GitHub issue or contact the development team.
+
+---
+
+**Last Updated:** 28 April 2026  
+**Status:** Production-ready monorepo with integrated frontend + backend threat detection platform.
 	- Automatically falls back to simulated telemetry if backend is unreachable.
 	- Uses WebSocket-first live updates with periodic REST reconciliation to reduce backend load.
 	- Exposes connection health and last-sync timestamps for operational visibility.
