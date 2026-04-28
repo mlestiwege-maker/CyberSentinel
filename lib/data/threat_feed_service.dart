@@ -319,6 +319,8 @@ class ThreatFeedService extends ChangeNotifier {
 
   bool get isBackendConnected => _backendHealthy;
 
+  bool get isRefreshing => _refreshInFlight;
+
   String get connectionLabel => _backendHealthy ? 'Live Backend' : 'Fallback Simulation';
 
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -339,6 +341,12 @@ class ThreatFeedService extends ChangeNotifier {
 
   /// Get all audit events (for export)
   List<AuditEvent> get allAuditEvents => List.unmodifiable(_auditEvents);
+
+  Future<void> refreshAll() async {
+    await _refreshFromBackend(notify: true);
+    await refreshMlInsights();
+    notifyListeners();
+  }
 
   Future<bool> runThreatDrill() async {
     if (!isAdministrator) {

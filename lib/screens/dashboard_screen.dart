@@ -2,7 +2,9 @@ import '../widgets/security_graph.dart';
 import '../widgets/alerts_table.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/kpi_strip.dart';
+import '../widgets/simulation/threat_drill_panel.dart';
 import '../data/threat_feed_service.dart';
+import '../data/incident_api_client.dart';
 import 'package:flutter/material.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -404,6 +406,7 @@ class DashboardScreen extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth >= 980;
+                 final sectionGap = 16.0;
 
                 return ListView(
                   children: [
@@ -436,6 +439,12 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _buildMlInsightsPanel(context, feed),
                     const SizedBox(height: 16),
+                    ThreatDrillPanel(feed: feed, isWide: isWide),
+
+                    SizedBox(height: sectionGap),
+                    _buildSlaStatsPanel(context, feed),
+                    SizedBox(height: sectionGap),
+
                     if (isWide)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,6 +485,80 @@ class DashboardScreen extends StatelessWidget {
                   ],
                 );
               },
+            ),
+          ),
+        );
+      },
+    );
+  }
+  Widget _buildSlaStatsPanel(BuildContext context, ThreatFeedService feed) {
+    final theme = Theme.of(context);
+    return FutureBuilder<Map<String, dynamic>>(
+      future: IncidentApiClient.getSlaStats(),
+      builder: (context, snapshot) {
+        final sla = snapshot.hasData ? snapshot.data!['sla'] ?? {} : {};
+        final avgResolve = sla['avg_resolution_time'];
+        final avgClose = sla['avg_time_to_close'];
+
+        String formatDuration(int? sec) {
+          if (sec == null) return 'N/A';
+          if (sec < 60) return '\${sec}s';
+          if (sec < 3600) return '\${sec ~/ 60}m \${sec % 60}s';
+          return '\${sec ~/ 3600}h \${(sec % 3600) ~/ 60}m';
+        }
+
+        return Card(
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.analytics, color: theme.colorScheme.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text('SLA Statistics', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Column(children: [
+                      Text('\$total', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                      Text('Total', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                    ]),
+                    Column(children: [
+                      Text('\$resolved', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.green)),
+                      Text('Resolved', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                    ]),
+                    Column(children: [
+                      Text('\$closed', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue)),
+                      Text('Closed', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                    ]),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Column(children: [
+                      Text(formatDuration(avgResolve), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('Avg Resolve', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                    ]),
+                    Container(width: 1, height: 24, color: theme.colorScheme.outlineVariant),
+                    Column(children: [
+                      Text(formatDuration(avgClose), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('Avg Close', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                    ]),
+                  ],
+                ),
+              ],
             ),
           ),
         );

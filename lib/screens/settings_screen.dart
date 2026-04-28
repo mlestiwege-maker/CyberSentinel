@@ -97,6 +97,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _tuneMlSensitivity(ThreatFeedService feed) async {
+    final controller = TextEditingController(text: '0.20');
+    final configuredValue = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Tune ML Sensitivity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Target false-positive rate (0.05 - 0.50)'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'False-positive rate',
+                  hintText: 'e.g. 0.20',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = double.tryParse(controller.text.trim());
+                if (parsed == null || parsed < 0.05 || parsed > 0.50) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter a value between 0.05 and 0.50.')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, parsed);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+    if (configuredValue == null) {
+      return;
+    }
+
+    final ok = await feed.tuneMlThreshold(targetFalsePositiveRate: configuredValue);
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'ML threshold tuned successfully (target FPR: ${configuredValue.toStringAsFixed(2)}).'
+              : 'Failed to tune ML threshold. Check backend availability and role permissions.',
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     for (var controller in _webhookControllers.values) {
@@ -113,6 +180,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     for (final channel in channels) {
       final isConfigured =
           _channelStatus?.channels[channel] == 'configured';
+      final isEmail = channel == 'email';
+      final fieldLabel = isEmail ? 'Recipient Email' : 'Webhook URL';
+      final hintText = isEmail
+          ? 'security-team@example.com'
+          : 'https://hooks.slack.com/services/...';
       sections.add(
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -142,8 +214,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     TextField(
                       controller: _webhookControllers[channel],
                       decoration: InputDecoration(
-                        labelText: 'Webhook URL',
-                        hintText: 'https://hooks.slack.com/services/...',
+                        labelText: fieldLabel,
+                        hintText: hintText,
                         border: const OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -362,10 +434,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_channelStatus != null)
                       ..._buildChannelConfigSections(),
                     const Divider(height: 0),
-                    const ListTile(
-                      leading: Icon(Icons.security_outlined),
-                      title: Text('Security profile'),
-                      subtitle: Text('Threat sensitivity and severity settings (coming soon)'),
+                    ListTile(
+                      leading: const Icon(Icons.security_outlined),
+                      title: const Text('Security profile'),
+                      subtitle: const Text('Tune ML threat sensitivity and decision threshold.'),
+                      trailing: FilledButton.tonalIcon(
+                        onPressed: () => _tuneMlSensitivity(feed),
+                        icon: const Icon(Icons.tune, size: 18),
+                        label: const Text('Tune ML'),
+                      ),
                     ),
                   ],
                 ),

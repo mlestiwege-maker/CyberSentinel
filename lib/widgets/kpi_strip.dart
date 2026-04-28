@@ -54,7 +54,7 @@ class KpiStrip extends StatelessWidget {
   }
 }
 
-class _KpiCard extends StatelessWidget {
+class _KpiCard extends StatefulWidget {
   const _KpiCard({
     required this.item,
     required this.colorScheme,
@@ -64,38 +64,103 @@ class _KpiCard extends StatelessWidget {
   final ColorScheme colorScheme;
 
   @override
-  Widget build(BuildContext context) {
-    final accent = item.color ?? colorScheme.primary;
+  State<_KpiCard> createState() => _KpiCardState();
+}
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: accent.withValues(alpha: 0.14),
-              child: Icon(item.icon, color: accent),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+class _KpiCardState extends State<_KpiCard> {
+  bool _isHovered = false;
+
+  int? _tryParseInt(String raw) => int.tryParse(raw.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final colorScheme = widget.colorScheme;
+    final accent = item.color ?? colorScheme.primary;
+    final numericValue = _tryParseInt(item.value);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.015 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: Card(
+          elevation: _isHovered ? 4.4 : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -18,
+                  top: -18,
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          accent.withValues(alpha: _isHovered ? 0.30 : 0.22),
+                          accent.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.label,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+                ),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: accent.withValues(alpha: 0.14),
+                      radius: 22,
+                      child: Icon(item.icon, color: accent),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (numericValue != null)
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: 0, end: numericValue.toDouble()),
+                              duration: const Duration(milliseconds: 900),
+                              curve: Curves.easeOutCubic,
+                              key: ValueKey('kpi-${item.label}-${item.value}'),
+                              builder: (context, value, _) {
+                                return Text(
+                                  value.round().toString(),
+                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.2,
+                                      ),
+                                );
+                              },
+                            )
+                          else
+                            Text(
+                              item.value,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.2,
+                                  ),
+                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.label,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

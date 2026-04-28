@@ -58,6 +58,8 @@ class SecurityGraph extends StatelessWidget {
             const SizedBox(height: 12),
             Expanded(
               child: LineChart(
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeOutCubic,
                 LineChartData(
                   minX: 0,
                   maxX: (safePoints.length - 1).toDouble(),

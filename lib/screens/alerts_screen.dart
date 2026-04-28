@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/kpi_strip.dart';
+import '../widgets/alerts_table.dart';
 import '../data/threat_feed_service.dart';
 
 class AlertsScreen extends StatefulWidget {
@@ -42,18 +43,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   Color _severityColor(String severity, BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    switch (severity) {
-      case 'Critical':
-        return scheme.error;
-      case 'High':
-        return scheme.tertiary;
-      case 'Medium':
-        return scheme.secondary;
-      case 'Low':
-      default:
-        return scheme.primary;
-    }
+    return getSeverityColor(severity);
   }
 
   @override
