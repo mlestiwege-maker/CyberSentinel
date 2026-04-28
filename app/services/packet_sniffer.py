@@ -50,16 +50,23 @@ class PacketSniffer:
     def _get_default_interface() -> str:
         """Auto-detect default network interface."""
         try:
-            import socket
-
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.connect(("8.8.8.8", 80))
-            interface = sock.getsockname()[1]
-            sock.close()
-            return interface or "eth0"
+            iface = str(conf.iface).strip()
+            if iface:
+                return iface
         except Exception:
-            # Fallback to common interface names
-            return "eth0"
+            pass
+
+        # Fallback to common interface name
+        return "eth0"
+
+    def _flush_buffer(self) -> None:
+        """Flush buffered features to callback."""
+        if not self._callback or not self._feature_buffer:
+            return
+
+        for feat in self._feature_buffer:
+            self._callback(feat)
+        self._feature_buffer.clear()
 
     def _extract_features(self, packet) -> PacketFeatures | None:
         """Extract ML-ready features from a packet."""
@@ -137,9 +144,7 @@ class PacketSniffer:
         if features and self._callback:
             self._feature_buffer.append(features)
             if len(self._feature_buffer) >= 10:  # Batch every 10 packets
-                for feat in self._feature_buffer:
-                    self._callback(feat)
-                self._feature_buffer.clear()
+                self._flush_buffer()
 
     def _sniff_thread(self) -> None:
         """Background thread for packet sniffing."""
@@ -175,6 +180,7 @@ class PacketSniffer:
         self.is_running = False
         if self._sniffer_thread:
             self._sniffer_thread.join(timeout=5)
+        self._flush_buffer()
 
     def get_stats(self) -> dict:
         """Get sniffer statistics."""
@@ -194,5 +200,11 @@ def get_sniffer(interface: str | None = None) -> PacketSniffer:
     """Get or create global packet sniffer instance."""
     global _global_sniffer
     if _global_sniffer is None:
+        _global_sniffer = PacketSniffer(interface)
+    elif (
+        interface is not None
+        and interface != _global_sniffer.interface
+        and not _global_sniffer.is_running
+    ):
         _global_sniffer = PacketSniffer(interface)
     return _global_sniffer

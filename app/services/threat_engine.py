@@ -14,7 +14,9 @@ from app.models import (
     TrafficEvent,
     WeeklyReport,
 )
+from app.services.ingest_idempotency import IngestIdempotencyWindow
 from app.services.ml_threat_model import get_threat_model
+from app.services.notification_service import NotificationService, NotificationChannel
 
 
 class ThreatEngine:
@@ -26,6 +28,7 @@ class ThreatEngine:
         self._lock = asyncio.Lock()
         self._subscribers: set[asyncio.Queue[dict]] = set()
         self._task: asyncio.Task | None = None
+        self._idempotency = IngestIdempotencyWindow(ttl_seconds=600, max_entries=25000)
 
     async def start(self) -> None:
         async with self._lock:
@@ -92,6 +95,16 @@ class ThreatEngine:
 
     async def ingest(self, event: TrafficEvent) -> IngestResponse:
         event_time = self._as_utc(event.timestamp)
+
+        signature = self._idempotency.signature_for_event(event)
+        if self._idempotency.check_and_mark(signature):
+            return IngestResponse(
+                accepted=True,
+                anomaly_score=0.0,
+                alert_generated=False,
+                alert_id=None,
+            )
+
         score = self._score_event(event)
         ml_model = get_threat_model()
         alert_threshold = ml_model.get_alert_threshold()
@@ -110,6 +123,9 @@ class ThreatEngine:
             alert = self._create_alert(event=event, score=score, event_time=event_time)
             self._append_alert(alert)
             alert_id = alert.id
+
+            # Send real-time notifications (non-blocking)
+            asyncio.create_task(self._send_alert_notifications(alert))
 
         await self._broadcast(
             {
@@ -226,6 +242,36 @@ class ThreatEngine:
             confidence=round(score, 3),
         )
 
+    async def _send_alert_notifications(self, alert: ThreatAlert) -> None:
+        """Send real-time notifications for a new alert."""
+        title = f"Security Alert: {alert.attack_type}"
+        message = (
+            f"Threat detected from {alert.source_ip}.\n"
+            f"Severity: {alert.severity}\n"
+            f"Status: {alert.status}\n"
+            f"Confidence: {alert.confidence * 100:.1f}%"
+        )
+        details = {
+            "alert_id": alert.id,
+            "attack_type": alert.attack_type,
+            "source_ip": alert.source_ip,
+            "severity": alert.severity,
+            "confidence": f"{alert.confidence * 100:.1f}%",
+            "description": alert.description,
+        }
+
+        try:
+            # Send to all configured channels (non-blocking best effort)
+            results = await NotificationService.send_notification(
+                title=title,
+                message=message,
+                severity=alert.severity,
+                details=details,
+            )
+            print(f"[NOTIFICATIONS] Alert {alert.id} sent: {results}")
+        except Exception as e:
+            print(f"[NOTIFICATIONS ERROR] Failed to send notifications: {e}")
+
     def _classify_attack(self, event: TrafficEvent, score: float) -> str:
         if event.destination_port == 445 and score > 0.85:
             return "Ransomware"
@@ -275,3 +321,22 @@ class ThreatEngine:
         if dt.tzinfo is None:
             return dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc)
+
+
+def classify_severity(score: float) -> str:
+    """Classify threat severity based on anomaly score.
+
+    Args:
+        score: Anomaly score between 0.0 and 1.0
+
+    Returns:
+        Severity level: "Critical", "High", "Medium", or "Low"
+    """
+    if score > 0.9:
+        return "Critical"
+    elif score > 0.7:
+        return "High"
+    elif score > 0.4:
+        return "Medium"
+    else:
+        return "Low"

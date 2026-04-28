@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 Severity = Literal["Critical", "High", "Medium", "Low"]
 AlertStatus = Literal["Investigating", "Blocked", "Monitoring", "Contained", "Resolved"]
+UserRole = Literal["admin", "responder", "analyst"]
 
 
 class TrafficEvent(BaseModel):
@@ -69,8 +70,26 @@ class IngestResponse(BaseModel):
     alert_id: str | None = None
 
 
+class AuthLoginRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=3, max_length=120)
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: str
+    username: str
+    role: UserRole
+
+
+class AuthProfileResponse(BaseModel):
+    username: str
+    role: UserRole
+
+
 class NotificationTestRequest(BaseModel):
-    channel: Literal["email", "push", "both"] = "both"
+    channel: Literal["email", "sms", "push", "system", "both", "all"] = "all"
     message: str = Field(min_length=4, max_length=200)
 
 
@@ -81,8 +100,8 @@ class NotificationTestResponse(BaseModel):
 
 
 class NotificationChannelConfig(BaseModel):
-    channel: Literal["slack", "teams", "email"] = "slack"
-    webhook_url: str = Field(min_length=10)
+    channel: Literal["slack", "teams", "email", "sms"] = "slack"
+    webhook_url: str = Field(min_length=3)
 
 
 class NotificationChannelStatus(BaseModel):

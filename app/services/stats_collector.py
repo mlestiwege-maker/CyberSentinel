@@ -3,7 +3,7 @@ Resilience statistics tracker for backend health monitoring.
 Tracks performance and failure metrics per endpoint.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -38,11 +38,11 @@ class ResilienceStatsCollector:
     """Collects and tracks resilience statistics per endpoint."""
     
     _instance = None
+    _stats: Dict[str, EndpointStats] = {}
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._stats: Dict[str, EndpointStats] = {}
         return cls._instance
     
     def record_request(
